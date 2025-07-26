@@ -1,6 +1,6 @@
 import { run } from "./jdis";
 
-const token = "YOUR_TOKEN_HERE";
+const token = "7jwwq3gh";
 
 run(
     () => {
