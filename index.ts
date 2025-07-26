@@ -14,16 +14,20 @@ run(
   },
   (bot, gameState) => {
     console.clear();
-    bot.print();
+    console.log(gameState.player.hp)
+    if(gameState.player.hp > 0)
+        bot.print();
 
-    mo.game(gameState)
+    // mo.game(gameState)
 
+    
     // Find the best move towards center while avoiding enemies and walls
     const nextPosition = mo.findBestMove(gameState, bot);
-    const currentPos = gameState.player.position;
+    console.log(nextPosition)
+    // const currentPos = gameState.player.position;
     
     // Log game information for debugging
-    mo.logGameInfo(gameState, currentPos, nextPosition, bot);
+    // mo.logGameInfo(gameState, currentPos, nextPosition, bot);
 
     return bot.move(nextPosition);
   },

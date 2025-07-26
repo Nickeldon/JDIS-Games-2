@@ -8,7 +8,7 @@ type GameStartFn = () => void;
 type TickFn = (bot: ReturnType<typeof createBot>, gameState: GameState) => Action;
 
 export function run(gameStart: GameStartFn, tick: TickFn, token: TeamToken) {
-    console.clear();
+    // console.clear();
     console.log(colors.bold(colors.yellow(" 🔥  FireWall  🔥")));
     console.log(`~ ${colors.red("JDIS Games 2025")} ~`);
     console.log();
