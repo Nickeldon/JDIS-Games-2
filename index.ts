@@ -1,5 +1,8 @@
 import { run } from "./jdis"; 
 
+import * as aloMethods from "./scripts/alo"
+import * as moMethods from "./scripts/mo"
+
 const token = "7jwwq3gh";
 
 run(
@@ -11,11 +14,10 @@ run(
         bot.print();
 
         gameState.player.name = "hehehe"
-        // Ajoutez votre code ici!
         
         console.log(gameState)
 
-        return bot.doNothing();
+        return bot.move({x: 0, y:0});
     },
     token,
 );
