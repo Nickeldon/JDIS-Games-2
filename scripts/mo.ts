@@ -1,3 +1,3 @@
 export const moFuncs = {
-    getPo
+    
 }
