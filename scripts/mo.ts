@@ -13,19 +13,20 @@ const PRIORITY = {
   NORMAL_MOVEMENT: 40
 };
 
-// Find nearby chests within scanning range
+// Find nearby chests within scanning range (increased for better detection)
 function findNearbyChests(gameState: GameState, bot: any): Position[] {
   const currentPos = gameState.player.position;
   const chests: Position[] = [];
   
-  // Scan for chests in a reasonable range
-  const scanRadius = 8;
+  // Scan for chests in an even larger range for continuous exploration
+  const scanRadius = 20; // Increased from 12 to 20 for wider chest detection
   for (let x = currentPos.x - scanRadius; x <= currentPos.x + scanRadius; x++) {
     for (let y = currentPos.y - scanRadius; y <= currentPos.y + scanRadius; y++) {
       try {
         const cell = bot.getGlobalCell({ x, y });
         if (cell === "chest") {
           chests.push({ x, y });
+          console.log(`🎁 CHEST DETECTED at (${x}, ${y}) - Distance: ${distance(currentPos, { x, y }).toFixed(2)}`);
         }
       } catch (e) {
         // Out of bounds or can't get cell info
@@ -70,7 +71,7 @@ function useInventoryItems(gameState: GameState, bot: any): any | null {
     // Use buff items strategically
     if (item.type === "buff") {
       console.log(`💪 Using buff item: ${item.name}`);
-      return bot.useItem(item.name, { type: "buff" });
+      return bot.useItemBuff(item);
     }
     
     // Use placed items (traps/walls) if enemies are nearby
@@ -85,11 +86,7 @@ function useInventoryItems(gameState: GameState, bot: any): any | null {
       };
       
       console.log(`🪤 Placing ${item.object.type}: ${item.name} at (${trapPos.x}, ${trapPos.y})`);
-      return bot.useItem(item.name, { 
-        type: "placed", 
-        position: trapPos, 
-        placeRectangleVertical: false 
-      });
+      return bot.useItemPlaced(item, trapPos);
     }
     
     // Use projectiles to attack nearby enemies
@@ -99,13 +96,13 @@ function useInventoryItems(gameState: GameState, bot: any): any | null {
       const direction = getDirectionToTarget(currentPos, nearestEnemy.position);
       
       console.log(`🏹 Firing projectile: ${item.name} ${direction} at enemy`);
-      return bot.useItem(item.name, { type: "projectile", direction });
+      return bot.useItemProjectile(item, direction);
     }
     
     // Use nuke if multiple enemies or in danger
     if (item.type === "nuke" && (gameState.enemies.length >= 2 || gameState.player.hp < 30)) {
       console.log(`💥 Using nuke: ${item.name}!`);
-      return bot.useItem(item.name, { type: "nuke" });
+      return bot.useItemNuke(item);
     }
   }
   
@@ -179,8 +176,8 @@ function analyzeFirewallPattern(gameState: GameState, bot: any): { pattern: stri
       // Concentrated firewall - go to opposite side
       firewallPattern = "corner";
       const oppositeDirection = {
-        x: currentPos.x - (avgFirewall.x - currentPos.x) * 2,
-        y: currentPos.y - (avgFirewall.y - currentPos.y) * 2
+        x: Math.floor(currentPos.x - (avgFirewall.x - currentPos.x) * 2),
+        y: Math.floor(currentPos.y - (avgFirewall.y - currentPos.y) * 2)
       };
       safeDirection = oppositeDirection;
       console.log("🎯 Pattern: CORNER/SIDE COLLAPSE - Escaping to opposite side");
@@ -225,13 +222,49 @@ function findClosestPosition(currentPos: Position, positions: Position[]): Posit
   return closest;
 }
 
-// Main decision making function with priorities (CHESTS FIRST)
+// Auto-equip items after collecting from chests
+function autoEquipItems(gameState: GameState, bot: any): any | null {
+  const inventory = gameState.player.inventory;
+  
+  for (const item of inventory) {
+    console.log(`🎒 Checking inventory item: ${item.name} (type: ${item.type})`);
+    
+    // Auto-use buff items for permanent benefits (healing, shields, etc.)
+    if (item.type === "buff") {
+      console.log(`💪 Auto-using buff item: ${item.name}`);
+      return bot.useItemBuff(item);
+    }
+    
+    // Keep projectiles, traps, placed items, and nukes for combat situations
+    // These should be used strategically, not automatically
+  }
+  
+  return null;
+}
+
+// Main decision making function with priorities (CONTINUOUS EXPLORATION)
 function makeStrategicDecision(gameState: GameState, bot: any): { position?: Position, phaseDirection?: CardinalDirection, action?: any } {
   const currentPos = gameState.player.position;
   
   console.log(`🤖 Decision making for position (${currentPos.x}, ${currentPos.y})`);
   
-  // PRIORITY 1: Check for nearby chests FIRST at every tick
+  // PRIORITY 1: Check for firewall FIRST - if detected, escape immediately
+  const firewallAnalysis = analyzeFirewallPattern(gameState, bot);
+  if (firewallAnalysis.pattern !== "no_firewall") {
+    if (!firewallDetected) {
+      firewallDetected = true;
+      console.log("🚨 FIREWALL DETECTED! Stopping exploration and prioritizing escape...");
+    }
+    
+    if (firewallAnalysis.safeDirection) {
+      console.log("🏃 ESCAPING FROM FIREWALL");
+      const escapeResult = moveTowardsTarget(gameState, firewallAnalysis.safeDirection, bot);
+      console.log(`📋 Escape move result:`, escapeResult);
+      return escapeResult;
+    }
+  }
+  
+  // PRIORITY 2: Check for nearby chests - if found, collect immediately
   const nearbyChests = findNearbyChests(gameState, bot);
   console.log(`🔍 Found ${nearbyChests.length} nearby chests`);
   
@@ -246,75 +279,163 @@ function makeStrategicDecision(gameState: GameState, bot: any): { position?: Pos
       console.log(`📦 Opening chest at (${closestChest.x}, ${closestChest.y})`);
       return { action: bot.openChest(closestChest) };
     } else {
-      // Move towards the chest - this takes priority over everything else
-      console.log(`🎁 CHEST PRIORITY: Moving towards chest at (${closestChest.x}, ${closestChest.y}) - Distance: ${distToChest.toFixed(2)}`);
+      // Move towards the chest
+      console.log(`🎁 CHEST FOUND: Moving towards chest at (${closestChest.x}, ${closestChest.y}) - Distance: ${distToChest.toFixed(2)}`);
       const moveResult = moveTowardsTarget(gameState, closestChest, bot);
       console.log(`📋 Move result:`, moveResult);
       return moveResult;
     }
   }
   
-  console.log("🔍 No chests nearby, proceeding with normal behavior...");
-  
-  // PRIORITY 2: Use items if we have them
-  const itemAction = useInventoryItems(gameState, bot);
-  if (itemAction) {
-    console.log("🎮 Using inventory item");
-    return { action: itemAction };
+  // PRIORITY 3: Auto-equip items after collecting chests
+  const equipAction = autoEquipItems(gameState, bot);
+  if (equipAction) {
+    console.log("🎮 Auto-equipping collected items");
+    return { action: equipAction };
   }
   
-  // PRIORITY 3: Attack enemies if they're in range
+  // PRIORITY 4: Attack enemies if they're very close (only if no firewall)
   const attackableEnemies = findAttackableEnemies(gameState);
-  const firewallAnalysis = analyzeFirewallPattern(gameState, bot);
-  
   if (attackableEnemies.length > 0) {
-    console.log(`⚔️ Attacking nearby enemy!`);
+    console.log(`⚔️ Attacking nearby enemy while exploring!`);
     const attackResult = moveTowardsTarget(gameState, attackableEnemies[0].position, bot);
     console.log(`📋 Attack move result:`, attackResult);
     return attackResult;
   }
   
-  // PRIORITY 4: Escape from firewall if detected
-  if (firewallAnalysis.pattern !== "no_firewall") {
-    if (!firewallDetected) {
-      firewallDetected = true;
-      console.log("🚨 FIREWALL DETECTED! Prioritizing escape...");
-    }
-    
-    if (firewallAnalysis.safeDirection) {
-      console.log("🏃 ESCAPING FROM FIREWALL");
-      const escapeResult = moveTowardsTarget(gameState, firewallAnalysis.safeDirection, bot);
-      console.log(`📋 Escape move result:`, escapeResult);
-      return escapeResult;
-    }
+  // PRIORITY 5: CONTINUOUS EXPLORATION - always keep moving to find chests
+  console.log("🗺️ No chests or firewall detected, continuing exploration...");
+  
+  // Generate random direction for exploration
+  const randomDirection = generateRandomDirection(currentPos, bot, gameState);
+  if (randomDirection) {
+    console.log(`🚶‍♂️ Exploring: Moving to (${randomDirection.x}, ${randomDirection.y}) to search for chests`);
+    const randomResult = moveTowardsTarget(gameState, randomDirection, bot);
+    console.log(`📋 Exploration result:`, randomResult);
+    return randomResult;
   }
   
-  // PRIORITY 5: Wait for firewall or explore
-  console.log("⏳ Waiting for firewall or exploring...");
-  
-  // Check for nearby PCB cells when waiting
+  // Fallback: Check for nearby PCB cells
   const nearbyPCB = findNearbyPCBCells(gameState, bot);
   console.log(`🔍 Found ${nearbyPCB.length} nearby PCB cells for movement`);
   if (nearbyPCB.length > 0) {
     const closestPCB = findClosestChest(currentPos, nearbyPCB); // reuse closest finding logic
-    console.log(`🎯 Closest PCB at (${closestPCB!.x}, ${closestPCB!.y})`);
+    console.log(`🎯 Moving to closest PCB at (${closestPCB!.x}, ${closestPCB!.y})`);
     const pcbResult = moveTowardsTarget(gameState, closestPCB!, bot);
     console.log(`📋 PCB move result:`, pcbResult);
     return pcbResult;
   }
   
-  const waitResult = { position: gameState.player.position };
-  console.log(`📋 Wait result:`, waitResult);
-  return waitResult;
+  // NEVER STOP MOVING! Force movement if all else fails
+  console.log("🚀 FORCING CONTINUOUS MOVEMENT - generating aggressive exploration direction");
+  const forcedDirection = generateAggressiveExploration(currentPos, bot);
+  if (forcedDirection) {
+    console.log(`💪 FORCED MOVEMENT: Moving to (${forcedDirection.x}, ${forcedDirection.y})`);
+    const forcedResult = moveTowardsTarget(gameState, forcedDirection, bot);
+    console.log(`📋 Forced move result:`, forcedResult);
+    return forcedResult;
+  }
+  
+  // Ultimate fallback: try phasing in a random direction
+  const emergencyDirections: CardinalDirection[] = ["up", "down", "left", "right"];
+  const randomPhaseDirection = emergencyDirections[Math.floor(Math.random() * emergencyDirections.length)];
+  console.log(`🆘 EMERGENCY PHASE: Phasing ${randomPhaseDirection} to keep moving!`);
+  return { phaseDirection: randomPhaseDirection };
+}
+
+// Generate a random direction for exploration (more aggressive exploration)
+function generateRandomDirection(currentPos: Position, bot: any, gameState: GameState): Position | null {
+  const directions: Position[] = [
+    { x: currentPos.x + 5, y: currentPos.y },     // Right (farther)
+    { x: currentPos.x - 5, y: currentPos.y },     // Left (farther)
+    { x: currentPos.x, y: currentPos.y + 5 },     // Up (farther)
+    { x: currentPos.x, y: currentPos.y - 5 },     // Down (farther)
+    { x: currentPos.x + 4, y: currentPos.y + 4 }, // Up-Right (farther)
+    { x: currentPos.x - 4, y: currentPos.y + 4 }, // Up-Left (farther)
+    { x: currentPos.x + 4, y: currentPos.y - 4 }, // Down-Right (farther)
+    { x: currentPos.x - 4, y: currentPos.y - 4 }, // Down-Left (farther)
+    { x: currentPos.x + 3, y: currentPos.y + 1 }, // Mixed directions for more coverage
+    { x: currentPos.x - 3, y: currentPos.y + 1 },
+    { x: currentPos.x + 1, y: currentPos.y + 3 },
+    { x: currentPos.x + 1, y: currentPos.y - 3 }
+  ];
+  
+  // Shuffle directions for randomness
+  for (let i = directions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = directions[i]!;
+    directions[i] = directions[j]!;
+    directions[j] = temp;
+  }
+  
+  // Find the first valid direction - prefer unexplored areas
+  for (const direction of directions) {
+    try {
+      // Always return a direction to keep moving
+      console.log(`🎲 Exploration direction chosen: (${direction.x}, ${direction.y})`);
+      return direction;
+    } catch (e) {
+      // Skip invalid directions
+    }
+  }
+  
+  // If no direction found, just pick the first one
+  return directions[0] || null;
+}
+
+// Generate even more aggressive exploration when stuck
+function generateAggressiveExploration(currentPos: Position, bot: any): Position | null {
+  const aggressiveDirections: Position[] = [
+    // Very far movements to break out of stuck situations
+    { x: currentPos.x + 10, y: currentPos.y },
+    { x: currentPos.x - 10, y: currentPos.y },
+    { x: currentPos.x, y: currentPos.y + 10 },
+    { x: currentPos.x, y: currentPos.y - 10 },
+    { x: currentPos.x + 8, y: currentPos.y + 8 },
+    { x: currentPos.x - 8, y: currentPos.y + 8 },
+    { x: currentPos.x + 8, y: currentPos.y - 8 },
+    { x: currentPos.x - 8, y: currentPos.y - 8 },
+    // Random far jumps in all directions
+    { x: currentPos.x + 15, y: currentPos.y + 3 },
+    { x: currentPos.x - 15, y: currentPos.y + 3 },
+    { x: currentPos.x + 3, y: currentPos.y + 15 },
+    { x: currentPos.x + 3, y: currentPos.y - 15 },
+    // Corner exploration for chests
+    { x: 50, y: 50 }, { x: -50, y: 50 }, 
+    { x: 50, y: -50 }, { x: -50, y: -50 },
+    // Central area exploration
+    { x: 0, y: 0 }, { x: 25, y: 0 }, { x: -25, y: 0 },
+    { x: 0, y: 25 }, { x: 0, y: -25 }
+  ];
+  
+  // Randomize to prevent predictable patterns
+  for (let i = aggressiveDirections.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = aggressiveDirections[i]!;
+    aggressiveDirections[i] = aggressiveDirections[j]!;
+    aggressiveDirections[j] = temp;
+  }
+  
+  // Always return a direction - aggressive exploration never fails
+  console.log(`🚀 AGGRESSIVE EXPLORATION: Heading to (${aggressiveDirections[0]!.x}, ${aggressiveDirections[0]!.y})`);
+  return aggressiveDirections[0] || { x: currentPos.x + 7, y: currentPos.y + 7 };
 }
 
 // Move towards target with obstacle detection and phasing
 function moveTowardsTarget(gameState: GameState, target: Position, bot: any): { position?: Position, phaseDirection?: CardinalDirection } {
-  const currentPos = gameState.player.position;
+  const currentPos = {
+    x: Math.floor(gameState.player.position.x),
+    y: Math.floor(gameState.player.position.y)
+  };
+  
+  const targetPos = {
+    x: Math.floor(target.x),
+    y: Math.floor(target.y)
+  };
   
   // Calculate next step towards target
-  const dx = target.x - currentPos.x;
-  const dy = target.y - currentPos.y;
+  const dx = targetPos.x - currentPos.x;
+  const dy = targetPos.y - currentPos.y;
   
   // Try direct movement first
   const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
@@ -325,7 +446,7 @@ function moveTowardsTarget(gameState: GameState, target: Position, bot: any): { 
     y: Math.floor(currentPos.y + stepY)
   };
   
-  console.log(`🎯 Target: (${target.x}, ${target.y}), Current: (${currentPos.x}, ${currentPos.y}), Direct next: (${directPosition.x}, ${directPosition.y})`);
+  console.log(`🎯 Target: (${targetPos.x}, ${targetPos.y}), Current: (${currentPos.x}, ${currentPos.y}), Direct next: (${directPosition.x}, ${directPosition.y})`);
   
   // Check what's at the direct position
   try {
@@ -342,8 +463,8 @@ function moveTowardsTarget(gameState: GameState, target: Position, bot: any): { 
   
   // Direct path blocked, try alternative directions
   const alternatives = [
-    { x: currentPos.x + stepX, y: currentPos.y }, // Try X-only movement
-    { x: currentPos.x, y: currentPos.y + stepY }, // Try Y-only movement
+    { x: Math.floor(currentPos.x + stepX), y: Math.floor(currentPos.y) }, // Try X-only movement
+    { x: Math.floor(currentPos.x), y: Math.floor(currentPos.y + stepY) }, // Try Y-only movement
   ];
   
   for (const altPos of alternatives) {
@@ -361,7 +482,7 @@ function moveTowardsTarget(gameState: GameState, target: Position, bot: any): { 
   }
   
   // All paths blocked, try phasing
-  const direction = getDirectionToTarget(currentPos, target);
+  const direction = getDirectionToTarget(currentPos, targetPos);
   console.log(`🚧 All paths blocked! Phasing ${direction}`);
   return { phaseDirection: direction };
 }
@@ -370,13 +491,13 @@ function distance(pos1: Position, pos2: Position): number {
   return Math.sqrt((pos1.x - pos2.x) ** 2 + (pos1.y - pos2.y) ** 2);
 }
 
-// Find nearby PCB cells that are walkable
+// Find nearby PCB cells that are walkable (expanded search)
 function findNearbyPCBCells(gameState: GameState, bot: any): Position[] {
   const currentPos = gameState.player.position;
   const pcbCells: Position[] = [];
   
-  // Scan for PCB cells in immediate vicinity
-  const scanRadius = 3;
+  // Scan for PCB cells in a larger area to ensure movement options
+  const scanRadius = 8; // Increased from 3 to 8 for more movement options
   for (let x = currentPos.x - scanRadius; x <= currentPos.x + scanRadius; x++) {
     for (let y = currentPos.y - scanRadius; y <= currentPos.y + scanRadius; y++) {
       // Skip current position
@@ -393,6 +514,7 @@ function findNearbyPCBCells(gameState: GameState, bot: any): Position[] {
     }
   }
   
+  console.log(`🔍 Scanned area ${scanRadius}x${scanRadius} around (${currentPos.x}, ${currentPos.y}) - Found ${pcbCells.length} PCB cells`);
   return pcbCells;
 }
 
