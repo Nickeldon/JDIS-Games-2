@@ -13,8 +13,6 @@ run(
         console.clear();
         bot.print();
 
-        gameState.player.name = "hehehe"
-        
         console.log(gameState)
 
         return bot.move({x: 0, y:0});
