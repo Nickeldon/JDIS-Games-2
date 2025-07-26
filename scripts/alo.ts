@@ -8,7 +8,8 @@ function findPathToCenter(gameState: GameState): Position {
 }
 
 function verifyPositionIntegrity(gameState: GameState){
-    const 
+    const objectArray = gameState.objects;
+    
 
 }
 
