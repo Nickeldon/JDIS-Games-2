@@ -1,6 +1,6 @@
 const aloFuncs = {
     func1: function () {
-
+        //hi
     }
 }
 
