@@ -15,7 +15,7 @@ run(
 
         console.log(gameState)
 
-        return bot.move({x: 0, y:0});
+        return aloMethods.default.moveToCenter(bot, gameState);
     },
     token,
 );
