@@ -28,6 +28,12 @@ run(
     // Log game info
     mo.logGameInfo(gameState, gameState.player.position, bot);
     
+    // Check if we have a specific action to perform
+    if (moveResult.action) {
+        console.log("🎮 Performing special action");
+        return moveResult.action;
+    }
+    
     // Check if we need to phase or move
     if (moveResult.phaseDirection) {
         console.log(`🌊 Phasing ${moveResult.phaseDirection} to bypass obstacle`);
