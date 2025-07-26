@@ -77,7 +77,7 @@ export function run(gameStart: GameStartFn, tick: TickFn, token: TeamToken) {
                     break;
                 }
                 case "tickInfoDead": {
-                    console.clear();
+                    // console.clear();
                     console.log("You are dead...");
                     break;
                 }

@@ -1,6 +1,6 @@
 import { run } from "./jdis";
 
-const token = "YOUR_TOKEN_HERE";
+const token = "7jwwq3gh";
 
 run(
     () => {
@@ -10,6 +10,7 @@ run(
         console.clear();
         bot.print();
 
+        console.log(gameState)
         // Ajoutez votre code ici!
 
         return bot.doNothing();
