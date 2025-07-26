@@ -1,0 +1,24 @@
+{
+    "name": "jdis-games-2025",
+    "private": true,
+    "scripts": {
+        "dev:local": "bun --hot index.ts",
+        "dev": "SERVER_URL=https://games.jdis.ca/ws-playground bun --hot index.ts",
+        "dev:ranked": "SERVER_URL=https://games.jdis.ca/ws bun --hot index.ts",
+        "start": "SERVER_URL=https://games.jdis.ca/ws-playground bun index.ts",
+        "start:ranked": "SERVER_URL=https://games.jdis.ca/ws bun index.ts",
+        "check": "biome check .",
+        "check:unsafe": "biome check --write --unsafe .",
+        "check:write": "biome check --write ."
+    },
+    "dependencies": {
+        "yoctocolors": "^2.1.1"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.0.0",
+        "@types/bun": "latest"
+    },
+    "peerDependencies": {
+        "typescript": "^5"
+    }
+}
