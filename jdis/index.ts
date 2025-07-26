@@ -13,6 +13,8 @@ export function run(gameStart: GameStartFn, tick: TickFn, token: TeamToken) {
     console.log(`~ ${colors.red("JDIS Games 2025")} ~`);
     console.log();
 
+    // console.log(tick)
+
     if (globalThis._jdis_internal && globalThis._jdis_internal.token === token) {
         console.log(colors.dim("Reusing existing WebSocket connection..."));
         console.log();
