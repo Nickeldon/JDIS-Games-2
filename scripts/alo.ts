@@ -6,19 +6,18 @@ function findPathToCenter(gameState: GameState): Position {
     const slope = (center.y - initialPosition.y) / (center.x - initialPosition.x);
     return { x: initialPosition.x * slope, y: initialPosition.y * slope };
 }
-
-function findPathToCorner(initial: Position, target: Position): { x: number; y: number } {
+function findPathToCorner(initial: Position, target: Position): Position {
     const dx = target.x - initial.x;
     const dy = target.y - initial.y;
-    const length = Math.sqrt(dx * dx + dy * dy);
-    if (length === 0) {
-        return { x: 0, y: 0 };
-    } else {
-        return {
-            x: initial.x + (dx / length),
-            y: initial.y + (dy / length)
-        }
-    }
+
+    // Move by one cell in the direction of the target
+    const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1 ;
+    const stepY = dy === 0 ? 0 : dy > 0 ? 1 : -1;
+
+    return {
+        x: initial.x + stepX,
+        y: initial.y + stepY
+    };
 }
 
 const aloFuncs = {
@@ -55,7 +54,7 @@ const aloFuncs = {
     }
 }
 
-export default aloFuncs
+export default aloFuncs;
 
 
 

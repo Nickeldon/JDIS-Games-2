@@ -17,8 +17,6 @@ run(
     console.log(gameState.objects);
     if(gameState.player.hp > 0)
         bot.print();
-
- 
     return bot.move(aloMethods.default.moveToCorner(gameState));
   },
   token
