@@ -14,11 +14,12 @@ run(
   (bot, gameState) => {
     console.clear();
     console.log(gameState.player.hp)
+    console.log(gameState.objects);
     if(gameState.player.hp > 0)
         bot.print();
 
  
-    return bot.move(aloMethods.default.moveCenter(gameState));
+    return bot.move(aloMethods.default.moveToCorner(gameState));
   },
   token
 );
